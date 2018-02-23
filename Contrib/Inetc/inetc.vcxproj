@@ -444,6 +444,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\Graphics\Icons\classic-install.ico" />
+    <Image Include="icon_download.ico" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="inetc.rc" />

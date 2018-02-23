@@ -17,6 +17,7 @@
 #define IDD_DIALOG2                     108
 #define IDI_ICON6                       109
 #define IDD_DIALOG3                     110
+#define IDI_DOWNLOAD                    123
 #define IDC_STATIC1                     1001
 #define IDC_STATIC2                     1002
 #define IDC_STATIC3                     1003
@@ -39,9 +40,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        111
+#define _APS_NEXT_RESOURCE_VALUE        119
 #define _APS_NEXT_COMMAND_VALUE         40001
 #define _APS_NEXT_CONTROL_VALUE         1018
-#define _APS_NEXT_SYMED_VALUE           101
+#define _APS_NEXT_SYMED_VALUE           124
 #endif
 #endif

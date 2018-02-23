@@ -29,6 +29,9 @@
     <Image Include="..\Graphics\Icons\classic-install.ico">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="icon_download.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="inetc.rc">
