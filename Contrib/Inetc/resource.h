@@ -1,22 +1,27 @@
 //{{NO_DEPENDENCIES}}
-// Microsoft Developer Studio generated include file.
+// Microsoft Visual C++ generated include file.
 // Used by inetc.rc
 //
+#define IDC                             2
 #define IDC_SLOGIN                      8
 #define IDC_PROGRESS                    10
 #define IDC_SUBTEXT                     11
 #define IDC_SPWD                        11
 #define IDC_ICON1                       12
 #define IDD_DIALOG1                     101
-#define IDI_ICON1                       102
-#define IDI_ICON2                       103
 #define IDD_AUTH                        104
-#define IDI_ICON3                       105
-#define IDI_ICON4                       106
-#define IDI_ICON5                       107
 #define IDD_DIALOG2                     108
-#define IDI_ICON6                       109
 #define IDD_DIALOG3                     110
+#define IDD_DIALOG4                     111
+#define IDC_MODERN_FILE                 114
+#define IDC_MODERN_DOWNLOADED           115
+#define IDC_MODERN_REMAINING            116
+#define IDC_MODERN_SPEED                117
+#define IDC_MODERN_CANCEL               118
+#define IDC_MODERN_FILE_TEXT            119
+#define IDC_MODERN_DOWNLOADED_TEXT      120
+#define IDC_MODERN_REMAINING_TEXT       121
+#define IDC_MODERN_SPEED_TEXT           122
 #define IDI_DOWNLOAD                    123
 #define IDC_STATIC1                     1001
 #define IDC_STATIC2                     1002

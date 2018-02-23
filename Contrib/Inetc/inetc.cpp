@@ -121,6 +121,8 @@
 *     Oct 17, 2015 - 1.0.5.2 - anders_k
 *              Tries to set FTP mode to binary before querying the size.
 *              Calls FtpGetFileSize if it exists.
+*     Mar 08, 2018 - Nadahar
+*              Created 4. download dialog option: /modernpopup
 *******************************************************/
 
 
@@ -244,7 +246,7 @@ fs = 0,
 timeout = 0,
 receivetimeout = 0;
 DWORD startTime, transfStart, openType;
-bool silent, popup, resume, nocancel, noproxy, nocookies, convToStack, g_ignorecertissues;
+bool silent, popup, modernPopup, resume, nocancel, noproxy, nocookies, convToStack, g_ignorecertissues;
 
 HWND childwnd;
 HWND hDlg;
@@ -287,6 +289,7 @@ static TCHAR szProgress[128] = TEXT("%dkB (%d%%) of %dkB @ %d.%01dkB/s");
 static TCHAR szRemaining[64] = TEXT(" (%d %s%s remaining)");
 static TCHAR szBasic[128] = TEXT("");
 static TCHAR szAuth[128] = TEXT("");
+static TCHAR szSpeed[32] = TEXT("");
 
 // is it possible to make it working with unicode strings?
 
@@ -1153,6 +1156,68 @@ void onTimer(HWND hDlg)
 }
 
 /*****************************************************
+* FUNCTION NAME: onTimerModern()
+* PURPOSE: 
+*    updates text fields every second
+* SPECIAL CONSIDERATIONS:
+*    
+*****************************************************/
+void onTimerModern(HWND hDlg)
+{
+	TCHAR b[138];
+	DWORD ct = (GetTickCount() - transfStart) / 1000;
+	DWORD tt = (GetTickCount() - startTime) / 1000;
+
+	// Dialog window caption
+	lstrcpy(b, *szCaption ? szCaption : PLUGIN_NAME);
+	//wsprintf(b, TEXT("%s - %s"), *szCaption ? szCaption : PLUGIN_NAME, szStatus[status]);
+	if(fs > 0 && fs != NOT_AVAILABLE && status == ST_DOWNLOAD)
+	{
+		wsprintf(b + lstrlen(b), TEXT(" - %d%%"), MulDiv(100, cnt, fs));
+	}
+	SetWindowText(hDlg, b);
+
+	// Current file
+	SetDlgItemText(hDlg, IDC_MODERN_FILE_TEXT, fn);
+
+	// Downloaded / Size
+	fsFormat(cnt, b);
+	lstrcat(b, TEXT(" / "));
+	fsFormat(fs, b + lstrlen(b));
+	SetDlgItemText(hDlg, IDC_MODERN_DOWNLOADED_TEXT, b);
+
+	if(cnt > 0)
+	{
+		// Time remaining
+		if(fs > 0 && fs != NOT_AVAILABLE)
+		{
+			SendDlgItemMessage(hDlg, IDC_PROGRESS1, PBM_SETPOS, MulDiv(cnt, PB_RANGE, fs), 0);
+			if (cnt > 5000)
+			{
+				ct = MulDiv(fs - cnt, ct, cnt);
+				wsprintf(b, TEXT("%d:%02d:%02d"), ct / 3600, (ct / 60) % 60, ct % 60);
+			}
+		}
+		else *b = 0;
+		SetDlgItemText(hDlg, IDC_MODERN_REMAINING_TEXT, b);
+
+		// Download speed
+		if(ct > 0 && status == ST_DOWNLOAD)
+		{
+			fsFormat(cnt / ct, b);
+			lstrcat(b, TEXT("/s"));
+		}
+		else *b = 0;
+		SetDlgItemText(hDlg, IDC_MODERN_SPEED_TEXT, b);
+	}
+	else
+	{
+		SetDlgItemText(hDlg, IDC_MODERN_REMAINING_TEXT, NULL);
+		SetDlgItemText(hDlg, IDC_MODERN_SPEED_TEXT, NULL);
+	}
+}
+
+/*****************************************************
 * FUNCTION NAME: centerDlg()
 * PURPOSE: 
 *    centers dlg on NSIS parent 
@@ -1167,7 +1232,7 @@ void centerDlg(HWND hDlg)
 
 	if(hwndParent == NULL || silent)
 		return;
-	if(popup)
+	if(popup || modernPopup)
 		GetWindowRect(hwndParent, &nsisRect);
 	else GetClientRect(hwndParent, &nsisRect);
 	GetWindowRect(hDlg, &dlgRect);
@@ -1177,7 +1242,7 @@ void centerDlg(HWND hDlg)
 	dlgX = (nsisRect.left + nsisRect.right - dlgWidth) / 2;
 	dlgY = (nsisRect.top + nsisRect.bottom - dlgHeight) / 2;
 
-	if(popup)
+	if(popup || modernPopup)
 	{
 		SystemParametersInfo(SPI_GETWORKAREA, 0, &waRect, 0);
 		if(dlgX > waRect.right - dlgWidth)
@@ -1220,7 +1285,7 @@ void onInitDlg(HWND hDlg)
 		} 
 		SetWindowLongPtr(hPrbNew, GWL_STYLE, prbStyle); 
 
-		if(!popup)
+		if(!popup && !modernPopup)
 		{
 			if((hFont = (HFONT)SendMessage(childwnd, WM_GETFONT, 0, 0)) != NULL)
 			{
@@ -1238,8 +1303,11 @@ void onInitDlg(HWND hDlg)
 	{
 		if(hCan != NULL)
 			ShowWindow(hCan, SW_HIDE);
-		if(popup)
+		if(popup || modernPopup)
+		{
 			SetWindowLongPtr(hDlg, GWL_STYLE, GetWindowLong(hDlg, GWL_STYLE) ^ WS_SYSMENU);
+			if (modernPopup) ShowWindow(GetDlgItem(hDlg, IDC_MODERN_CANCEL), SW_HIDE);
+		}	
 	}
 	SendDlgItemMessage(hDlg, IDC_PROGRESS1, PBM_SETRANGE,
 		0, MAKELPARAM(0, PB_RANGE));
@@ -1251,7 +1319,19 @@ void onInitDlg(HWND hDlg)
 		SetWindowText(hDlg, *szCaption ? szCaption : PLUGIN_NAME);
 	}
 	SetTimer(hDlg, 1, 1000, NULL);
-	if(*szUrl != 0)
+	if(modernPopup)
+	{
+		if(*szSpeed != 0)
+		{
+			SetDlgItemText(hDlg, IDC_MODERN_FILE, szDownloading);
+			SetDlgItemText(hDlg, IDC_MODERN_DOWNLOADED, szProgress);
+			SetDlgItemText(hDlg, IDC_MODERN_REMAINING, szRemaining);
+			SetDlgItemText(hDlg, IDC_MODERN_SPEED, szSpeed);
+		}
+		if(*szCancel != 0)
+			SetDlgItemText(hDlg, IDC_MODERN_CANCEL, szCancel);
+	}
+	else if(popup && *szUrl != 0)
 	{
 		SetDlgItemText(hDlg, IDC_STATIC20, szUrl);
 		SetDlgItemText(hDlg, IDC_STATIC21, szDownloading);
@@ -1292,16 +1372,28 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 			//  long connection period and paused state updates
 			if(status != ST_DOWNLOAD && GetTickCount() - transfStart > PROGRESS_MS)
 				transfStart += PROGRESS_MS;
-			if(popup) onTimer(hDlg); else progress_callback();
-			RedrawWindow(GetDlgItem(hDlg, IDC_STATIC1), NULL, NULL, RDW_INVALIDATE);
-			RedrawWindow(GetDlgItem(hDlg, IDCANCEL), NULL, NULL, RDW_INVALIDATE);
-			RedrawWindow(GetDlgItem(hDlg, IDC_PROGRESS1), NULL, NULL, RDW_INVALIDATE);
+			if(modernPopup)
+			{
+				onTimerModern(hDlg);
+				RedrawWindow(GetDlgItem(hDlg, IDC_MODERN_DOWNLOADED_TEXT), NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(GetDlgItem(hDlg, IDC_MODERN_REMAINING_TEXT), NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(GetDlgItem(hDlg, IDC_MODERN_SPEED_TEXT), NULL, NULL, RDW_INVALIDATE);
+			} 
+			else
+			{
+				if(popup) onTimer(hDlg);
+				else progress_callback();
+				RedrawWindow(GetDlgItem(hDlg, IDC_STATIC1), NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(GetDlgItem(hDlg, IDCANCEL), NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(GetDlgItem(hDlg, IDC_PROGRESS1), NULL, NULL, RDW_INVALIDATE);
+			}
 		}
 		break;
 	case WM_COMMAND:
 		switch(LOWORD(wParam))
 		{
 		case IDCANCEL:
+		case IDC_MODERN_CANCEL:
 			if(nocancel) break;
 			if(szQuestion &&
 				MessageBox(hDlg, szQuestion, *szCaption ? szCaption : PLUGIN_NAME, MB_ICONWARNING|MB_YESNO) == IDNO)
@@ -1348,7 +1440,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 	EXDLL_INIT();
 
 // for repeating /nounload plug-un calls - global vars clean up
-	silent = popup = resume = nocancel = noproxy = nocookies = false;
+	silent = popup = modernPopup = resume = nocancel = noproxy = nocookies = false;
 	g_ignorecertissues = false;
 	myFtpCommand = NULL;
 	openType = INTERNET_OPEN_TYPE_PRECONFIG;
@@ -1394,6 +1486,12 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 			szAlias = (TCHAR*)LocalAlloc(LPTR, string_size * sizeof(TCHAR));
 			popstring(szAlias);
 		}
+		else if(lstrcmpi(url, TEXT("/modernpopup")) == 0)
+		{
+			modernPopup = true;
+			szAlias = (TCHAR*)LocalAlloc(LPTR, string_size * sizeof(TCHAR));
+			popstring(szAlias);
+		}
 		else if(lstrcmpi(url, TEXT("/resume")) == 0)
 		{
 			popstring(url);
@@ -1402,7 +1500,15 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 		}
 		else if(lstrcmpi(url, TEXT("/translate")) == 0)
 		{
-			if(popup)
+			if(modernPopup)
+			{
+				popstring(szDownloading); // Downloading file
+				popstring(szProgress); // Downloaded
+				popstring(szRemaining); // Time remaining
+				popstring(szSpeed); // Speed
+				popstring(szCancel); // Cancel button
+			}
+			else if(popup)
 			{
 				popstring(szUrl);
 				popstring(szStatus[ST_DOWNLOAD]); // Downloading
@@ -1516,11 +1622,11 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 		SetDlgItemText(childwnd, 1006, *szCaption ? szCaption : PLUGIN_NAME);
 	else InitCommonControls(); // or NSIS do this before .onInit?
 	// cannot embed child dialog to non-existing parent. Using 'silent' to hide it
-	if(childwnd == NULL && !popup) silent = true;
+	if(childwnd == NULL && !popup && !modernPopup) silent = true;
 	// let's use hidden popup dlg in the silent mode - works both on .onInit and Page
 	if(silent) { resume = false; popup = true; }
 	// google says WS_CLIPSIBLINGS helps to redraw... not in my tests...
-	if(!popup)
+	if(!popup && !modernPopup)
 	{
 		unsigned int wstyle = GetWindowLong(childwnd, GWL_STYLE);
 		wstyle |= WS_CLIPSIBLINGS;
@@ -1528,8 +1634,8 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 	}
 	startTime = GetTickCount();
 	if((hDlg = CreateDialog(g_hInstance,
-		MAKEINTRESOURCE(szBanner ? IDD_DIALOG2 : (popup ? IDD_DIALOG1 : IDD_DIALOG3)),
-		(popup ? hwndParent : childwnd), dlgProc)) != NULL)
+		MAKEINTRESOURCE(szBanner ? IDD_DIALOG2 : (modernPopup ? IDD_DIALOG4 : (popup ? IDD_DIALOG1 : IDD_DIALOG3))),
+		(popup || modernPopup ? hwndParent : childwnd), dlgProc)) != NULL)
 	{
 
 		if((hThread = CreateThread(NULL, 0, inetTransfer, (LPVOID)hDlg, 0,
@@ -1542,7 +1648,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 			if(!silent)
 			{
 				ShowWindow(hDlg, SW_NORMAL);
-				if(childwnd && !popup)
+				if(childwnd && !popup && !modernPopup)
 				{
 					if(hButton)
 					{
@@ -1575,7 +1681,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 			if(!silent && childwnd)
 			{
 				SetDlgItemText(childwnd, 1006, TEXT(""));
-				if(!popup)
+				if(!popup && !modernPopup)
 				{
 					if(hButton)
 						SetWindowLongPtr(hButton, GWL_STYLE, dwStyleButton);
