@@ -1,0 +1,9 @@
+*.opensdf
+*.sdf
+*.suo
+*.user
+/Intermediate
+*.exp
+*.lib
+*.aps
+/Plugins
