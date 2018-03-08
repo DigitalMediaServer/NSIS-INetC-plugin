@@ -9,10 +9,11 @@ Download:<br>
 
 == Description ==
 
-Internet client plug-in for files download and upload. Based on the InetLoad plug-in. Network implementation uses MS WinInet API, supports http/https and ftp protocols. Plugin has better proxy support compared to NSISdl plug-in. Command line may include few URL/File pairs to be transfered. If server or proxy login/password are not set in the script, it displays IE-style authentication dialog (except silent mode). Plug-in supports 3 "transfer in progress" display modes:
+Internet client plug-in for files download and upload. Based on the InetLoad plug-in. Network implementation uses MS WinInet API, supports http/https and ftp protocols. Plugin has better proxy support compared to NSISdl plug-in. Command line may include few URL/File pairs to be transfered. If server or proxy login/password are not set in the script, it displays IE-style authentication dialog (except silent mode). Plug-in supports 4 "transfer in progress" display modes:
 
 # old NSISdl style - additional embedded progress bar and text on the INSTFILES page;
 # POPUP dialog mode with detailed info;
+# MODERNPOPUP like POPUP but with a less ancient look;
 # BANNER mode with simple popup window.
 
 Plug-in recognizes Installer's Silent mode and this case hides any output (this feature requires NSIS 2.03 or later). Program implements simple re-get functionality - host reconnect and download from current position after short pause. While program depends on IE settings, it changes current IE mode to online. NSISdl code fragment was used for progress bar displaying in the "old style" mode.
@@ -27,8 +28,8 @@ Plug-in DLL functions (entry points): get, post, head, put
 
 <highlight-nsis>inetc::get [/PROXY IP:PORT] [/USERNAME PROXY_LOGIN /PASSWORD PROXY_PASSWD]
  [/NOPROXY] [/NOCANCEL] [/CONNECTTIMEOUT TO_SEC] [/RECEIVETIMEOUT TO_SEC] [/SILENT] [/WEAKSECURITY]
- [/CAPTION TEXT] [/NOCOOKIES] [/RESUME RETRY_QUESTION] [/POPUP HOST_ALIAS | /BANNER TEXT] 
- [/CANCELTEXT CANCEL_TEXT] [/QUESTION CANCEL_QUESTION] [/USERAGENT USER_AGENT_TEXT] 
+ [/CAPTION TEXT] [/NOCOOKIES] [/RESUME RETRY_QUESTION] [/POPUP HOST_ALIAS /MODERNPOPUP HOST_ALIAS | /BANNER TEXT]
+ [/CANCELTEXT CANCEL_TEXT] [/QUESTION CANCEL_QUESTION] [/USERAGENT USER_AGENT_TEXT]
  [/HEADER HEADER_TEXT] [/TRANSLATE LANG_PARAMS] [/TOSTACK | /TOSTACKCONV]
  URL1 local_file1 [URL2 local_file2 [...]] [/END]</highlight-nsis>
 This call returns "OK" string if successful, error description string if failed (see included InetLoad.cpp file for a full set of status strings). Usage and result processing samples are included to the package.
@@ -68,6 +69,9 @@ This call returns "OK" string if successful, error description string if failed 
 
 ; /POPUP
 : This mode displays detailed download dialog instead of embedded progress bar. Also useful in .onInit function (i.e. not in Section). If HOST_ALIAS is not "", text will replace URL in the dialog - this allows to hide real URL (including password). 
+
+; /MODERNPOPUP
+: Like POPUP but with a design that looks less like Windows 3.11 The same rules applies for HOST_ALIAS.
 
 ; /BANNER 
 : Displays simple popup dialog (MSI Banner mode) and sets dialog TEXT (up to 3 lines using $\n).
