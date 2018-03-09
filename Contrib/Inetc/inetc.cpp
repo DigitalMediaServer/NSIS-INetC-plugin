@@ -951,7 +951,7 @@ DWORD __stdcall inetTransfer(void *hw)
 									SendDlgItemMessage(hDlg, IDC_PROGRESS1, PBM_SETPOS, 0, 0);
 									SetWindowText(GetDlgItem(hDlg, IDC_STATIC5), fs == NOT_AVAILABLE ? TEXT("Not Available") : TEXT(""));
 									SetWindowText(GetDlgItem(hDlg, IDC_STATIC4), fs == NOT_AVAILABLE ? TEXT("Unknown") : TEXT(""));
-									SetWindowLong(hBar, GWL_STYLE, fs == NOT_AVAILABLE ?
+									SetWindowLongPtr(hBar, GWL_STYLE, fs == NOT_AVAILABLE ?
 										(GetWindowLong(hBar, GWL_STYLE) | PBS_MARQUEE) : (GetWindowLong(hBar, GWL_STYLE) & ~PBS_MARQUEE)); 
 									SendDlgItemMessage(hDlg, IDC_PROGRESS1, PBM_SETMARQUEE, (WPARAM)(fs == NOT_AVAILABLE ? 1 : 0), (LPARAM)50 );
 									fileTransfer(localFile, hFile);
@@ -1218,7 +1218,7 @@ void onInitDlg(HWND hDlg)
 		{ 
 			prbStyle |= GetWindowLong(hPrbOld, GWL_STYLE); 
 		} 
-		SetWindowLong(hPrbNew, GWL_STYLE, prbStyle); 
+		SetWindowLongPtr(hPrbNew, GWL_STYLE, prbStyle); 
 
 		if(!popup)
 		{
@@ -1239,7 +1239,7 @@ void onInitDlg(HWND hDlg)
 		if(hCan != NULL)
 			ShowWindow(hCan, SW_HIDE);
 		if(popup)
-			SetWindowLong(hDlg, GWL_STYLE, GetWindowLong(hDlg, GWL_STYLE) ^ WS_SYSMENU);
+			SetWindowLongPtr(hDlg, GWL_STYLE, GetWindowLong(hDlg, GWL_STYLE) ^ WS_SYSMENU);
 	}
 	SendDlgItemMessage(hDlg, IDC_PROGRESS1, PBM_SETRANGE,
 		0, MAKELPARAM(0, PB_RANGE));
@@ -1524,7 +1524,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 	{
 		unsigned int wstyle = GetWindowLong(childwnd, GWL_STYLE);
 		wstyle |= WS_CLIPSIBLINGS;
-		SetWindowLong(childwnd, GWL_STYLE, wstyle);
+		SetWindowLongPtr(childwnd, GWL_STYLE, wstyle);
 	}
 	startTime = GetTickCount();
 	if((hDlg = CreateDialog(g_hInstance,
@@ -1578,7 +1578,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 				if(!popup)
 				{
 					if(hButton)
-						SetWindowLong(hButton, GWL_STYLE, dwStyleButton);
+						SetWindowLongPtr(hButton, GWL_STYLE, dwStyleButton);
 					if(hList && fVisibleList)
 						ShowWindow(hList, SW_SHOW);
 				}
