@@ -105,23 +105,31 @@
 *     Jun 15, 2011 Stack clean up fix on cancel - zenpoy
 *     Oct 19, 2011 FTP PUT error parsing fix - tperquin
 *     Aug 19, 2013 Fix focus stealing when in silent - negativesir, JohnTHaller
-*     Jul 20, 2014 - 1.0.4.4 - Stuart 'Afrow UK' Welch
+* Stuart 'Afrow UK' Welch
+*     Jul 20, 2014 - 1.0.4.4
 *              /tostack & /tostackconv added
 *              Version information resource added
 *              Updated to NSIS 3.0 plugin API
 *              Upgraded to Visual Studio 2012
 *              64-bit build added
 *              MSVCRT dependency removed
-*     Sep 04, 2015 - 1.0.5.0 - anders_k
+* anders_k
+*     Sep 04, 2015 - 1.0.5.0
 *              HTTPS connections are more secure by default
 *              Added /weaksecurity switch, reverts to old cert. security checks
-*     Sep 06, 2015 - 1.0.5.1 - anders_k
+*     Sep 06, 2015 - 1.0.5.1
 *              Don't allow infinite FtpCreateDirectory tries
 *              Use memset intrinsic when possible to avoid VC code generation bug
-*     Oct 17, 2015 - 1.0.5.2 - anders_k
+*     Oct 17, 2015 - 1.0.5.2
 *              Tries to set FTP mode to binary before querying the size.
 *              Calls FtpGetFileSize if it exists.
-*     Mar 08, 2018 - Nadahar
+* Nutty
+*     Feb 08, 2017 - 1.0.5.3
+*              Add /textcolor "RRGGBB" and /bgcolor "RRGGBB"
+*              based on code posted by rmangroliya:
+*              <http://forums.winamp.com/showthread.php?t=334819>
+* Nadahar
+*     Mar 08, 2018 - 1.0.5.4
 *              Created 4. download dialog option: /modernpopup
 *******************************************************/
 
@@ -136,6 +144,7 @@
 #include "resource.h"
 
 #include <string.h> // strstr etc
+#include <iostream> // sscanf
 
 #ifndef PBM_SETMARQUEE
 #define PBM_SETMARQUEE (WM_USER + 10)
@@ -233,6 +242,8 @@ TCHAR fn[MAX_PATH]=TEXT(""),
 szCancel[64]=TEXT(""),
 szCaption[128]=TEXT(""),
 szUserAgent[256]=TEXT(""),
+szTextColor[7]=TEXT(""),
+szBgColor[7]=TEXT(""),
 szResume[256] = TEXT("Your internet connection seems to be not permitted or dropped out!\nPlease reconnect and click Retry to resume installation.");
 CHAR *szPost = NULL,
 post_fname[MAX_PATH] = "";
@@ -1409,7 +1420,49 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 			break;
 		}
 		return false;
+	case WM_CTLCOLORSTATIC:
+    {
+		HDC hdcStatic = (HDC)wParam;
+		if (szTextColor != NULL && szTextColor[0] != 0)
+		{
+			unsigned int fgR, fgG, fgB;
+			sscanf_s(szTextColor, "%02x%02x%02x", &fgR, &fgG, &fgB);
+			SetTextColor(hdcStatic, RGB(fgR, fgG, fgB));
+		}
+		else
+			SetTextColor(hdcStatic, RGB(0, 0, 0));				// 0x000000
+		
+		SetBkMode(hdcStatic, TRANSPARENT);
+		if (szBgColor != NULL && szBgColor[0] != 0)
+		{
+			unsigned int bgR, bgG, bgB;
+			sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
+			SetBkColor(hdcStatic, RGB(bgR, bgG, bgB));
+			return (LONG)CreateSolidBrush(RGB(bgR, bgG, bgB));
+		}
+		else
+		{
+			SetBkColor(hdcStatic, RGB(244, 244, 244));
+			return (LONG)CreateSolidBrush(RGB(244, 244, 244));	// 0xF4F4F4
+		}
+    }
+	case WM_CTLCOLORDLG:
+	{
+		if (szBgColor != NULL && szBgColor[0] != 0)
+		{
+			unsigned int bgR, bgG, bgB;
+			sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
+			return (LONG)CreateSolidBrush(RGB(bgR, bgG, bgB));
+		}
+		else
+			return (LONG)CreateSolidBrush(RGB(244, 244, 244));	// 0xF4F4F4
+	}
 	default:
+		/*
+		LRESULT returnVal;
+		returnVal = DefWindowProc(hDlg, message, wParam, lParam);
+		return returnVal;
+		*/
 		return false;
 	}
 	return true;
@@ -1445,7 +1498,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 	myFtpCommand = NULL;
 	openType = INTERNET_OPEN_TYPE_PRECONFIG;
 	status = ST_CONNECTING;
-	*szCaption = *szCancel = *szUserAgent = *szBasic = *szAuth = 0;
+	*szCaption = *szCancel = *szUserAgent = *szBasic = *szAuth = *szTextColor = *szBgColor = 0;
 
 	url = (TCHAR*)LocalAlloc(LPTR, string_size * sizeof(TCHAR));
 	if(szPost)
@@ -1606,6 +1659,10 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 			}
 			CloseHandle(hFile);
 		}
+		else if(lstrcmpi(url, TEXT("/textcolor")) == 0)
+			popstring(szTextColor);
+		else if(lstrcmpi(url, TEXT("/bgcolor")) == 0)
+			popstring(szBgColor);
 	}
 	pushstring(url);
 //	if(*szCaption == 0) lstrcpy(szCaption, PLUGIN_NAME);
