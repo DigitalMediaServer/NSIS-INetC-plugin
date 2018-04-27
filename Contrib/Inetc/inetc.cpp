@@ -1426,7 +1426,11 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		if (szTextColor != NULL && szTextColor[0] != 0)
 		{
 			unsigned int fgR, fgG, fgB;
-			sscanf_s(szTextColor, "%02x%02x%02x", &fgR, &fgG, &fgB);
+			#ifdef  UNICODE
+				swscanf_s(szTextColor, L"%02x%02x%02x", &fgR, &fgG, &fgB);
+			#else
+				sscanf_s(szTextColor, "%02x%02x%02x", &fgR, &fgG, &fgB);
+			#endif
 			SetTextColor(hdcStatic, RGB(fgR, fgG, fgB));
 		}
 		else
@@ -1436,7 +1440,11 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		if (szBgColor != NULL && szBgColor[0] != 0)
 		{
 			unsigned int bgR, bgG, bgB;
-			sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
+			#ifdef  UNICODE
+				swscanf_s(szBgColor, L"%02x%02x%02x", &bgR, &bgG, &bgB);
+			#else
+				sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
+			#endif
 			SetBkColor(hdcStatic, RGB(bgR, bgG, bgB));
 			return (LONG)CreateSolidBrush(RGB(bgR, bgG, bgB));
 		}
@@ -1451,7 +1459,11 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		if (szBgColor != NULL && szBgColor[0] != 0)
 		{
 			unsigned int bgR, bgG, bgB;
-			sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
+			#ifdef  UNICODE
+				swscanf_s(szBgColor, L"%02x%02x%02x", &bgR, &bgG, &bgB);
+			#else
+				sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
+			#endif
 			return (LONG)CreateSolidBrush(RGB(bgR, bgG, bgB));
 		}
 		else
