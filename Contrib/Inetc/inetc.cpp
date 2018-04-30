@@ -1423,6 +1423,7 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 	case WM_CTLCOLORSTATIC:
     {
 		HDC hdcStatic = (HDC)wParam;
+		szTextColor[6] = 0;
 		if (szTextColor != NULL && szTextColor[0] != 0)
 		{
 			unsigned int fgR, fgG, fgB;
@@ -1437,6 +1438,7 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 			SetTextColor(hdcStatic, RGB(0, 0, 0));				// 0x000000
 		
 		SetBkMode(hdcStatic, TRANSPARENT);
+		szBgColor[6] = 0;
 		if (szBgColor != NULL && szBgColor[0] != 0)
 		{
 			unsigned int bgR, bgG, bgB;
@@ -1456,6 +1458,7 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
     }
 	case WM_CTLCOLORDLG:
 	{
+		szBgColor[6] = 0;
 		if (szBgColor != NULL && szBgColor[0] != 0)
 		{
 			unsigned int bgR, bgG, bgB;
