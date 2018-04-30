@@ -242,8 +242,8 @@ TCHAR fn[MAX_PATH]=TEXT(""),
 szCancel[64]=TEXT(""),
 szCaption[128]=TEXT(""),
 szUserAgent[256]=TEXT(""),
-szTextColor[7]=TEXT(""),
-szBgColor[7]=TEXT(""),
+szTextColor[64]={ 0 },
+szBgColor[64]={ 0 },
 szResume[256] = TEXT("Your internet connection seems to be not permitted or dropped out!\nPlease reconnect and click Retry to resume installation.");
 CHAR *szPost = NULL,
 post_fname[MAX_PATH] = "";
@@ -1423,10 +1423,12 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 	case WM_CTLCOLORSTATIC:
     {
 		HDC hdcStatic = (HDC)wParam;
-		szTextColor[6] = 0;
 		if (szTextColor != NULL && szTextColor[0] != 0)
 		{
 			unsigned int fgR, fgG, fgB;
+
+			fgR = fgG = fgB = 0;
+
 			#ifdef  UNICODE
 				swscanf_s(szTextColor, L"%02x%02x%02x", &fgR, &fgG, &fgB);
 			#else
@@ -1438,10 +1440,13 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 			SetTextColor(hdcStatic, RGB(0, 0, 0));				// 0x000000
 		
 		SetBkMode(hdcStatic, TRANSPARENT);
-		szBgColor[6] = 0;
+
 		if (szBgColor != NULL && szBgColor[0] != 0)
 		{
 			unsigned int bgR, bgG, bgB;
+
+			bgR = bgG = bgB = 0;
+
 			#ifdef  UNICODE
 				swscanf_s(szBgColor, L"%02x%02x%02x", &bgR, &bgG, &bgB);
 			#else
@@ -1458,10 +1463,12 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
     }
 	case WM_CTLCOLORDLG:
 	{
-		szBgColor[6] = 0;
 		if (szBgColor != NULL && szBgColor[0] != 0)
 		{
 			unsigned int bgR, bgG, bgB;
+
+			bgR = bgG = bgB = 0;
+
 			#ifdef  UNICODE
 				swscanf_s(szBgColor, L"%02x%02x%02x", &bgR, &bgG, &bgB);
 			#else
@@ -1682,7 +1689,6 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 	pushstring(url);
 //	if(*szCaption == 0) lstrcpy(szCaption, PLUGIN_NAME);
 	if(*szUserAgent == 0) lstrcpy(szUserAgent, INETC_USERAGENT);
-	if(*szPassword && *szUsername)
 	{
 		wsprintf(url, TEXT("%s:%s"), szUsername, szPassword);
 		encode_base64(lstrlen(url), url, szAuth);
