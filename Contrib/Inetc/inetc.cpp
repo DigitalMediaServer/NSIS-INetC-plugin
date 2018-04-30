@@ -1689,6 +1689,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 	pushstring(url);
 //	if(*szCaption == 0) lstrcpy(szCaption, PLUGIN_NAME);
 	if(*szUserAgent == 0) lstrcpy(szUserAgent, INETC_USERAGENT);
+	if(*szPassword && *szUsername)
 	{
 		wsprintf(url, TEXT("%s:%s"), szUsername, szPassword);
 		encode_base64(lstrlen(url), url, szAuth);
