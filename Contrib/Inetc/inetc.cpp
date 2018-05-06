@@ -144,7 +144,6 @@
 #include "resource.h"
 
 #include <string.h> // strstr etc
-#include <iostream> // sscanf
 
 #ifndef PBM_SETMARQUEE
 #define PBM_SETMARQUEE (WM_USER + 10)
@@ -242,9 +241,12 @@ TCHAR fn[MAX_PATH]=TEXT(""),
 szCancel[64]=TEXT(""),
 szCaption[128]=TEXT(""),
 szUserAgent[256]=TEXT(""),
-szTextColor[64]={ 0 },
-szBgColor[64]={ 0 },
 szResume[256] = TEXT("Your internet connection seems to be not permitted or dropped out!\nPlease reconnect and click Retry to resume installation.");
+COLORREF textColor = 0, 
+bgColor = 0;
+bool textColorSet = false, 
+bgColorSet = false;
+HBRUSH bgBrush = NULL;
 CHAR *szPost = NULL,
 post_fname[MAX_PATH] = "";
 DWORD fSize = 0;
@@ -1056,6 +1058,34 @@ void fsFormat(DWORD bfs, TCHAR *b)
 	else wsprintf(b, TEXT("%u MB"), (bfs / 1024 / 1024));
 }
 
+/*****************************************************
+* FUNCTION NAME: parseColor()
+* PURPOSE: 
+*    Parse a COLORREF from a string containing a 
+*    hexadecimal RRGGBB value.
+* SPECIAL CONSIDERATIONS:
+*
+*****************************************************/
+COLORREF parseColor(const TCHAR *string)
+{
+	unsigned long value = 0;
+
+	for (;;)
+	{
+		int c = *(string++);
+		if (c >= _T('0') && c <= _T('9')) c-=_T('0');
+		else if (c >= _T('a') && c <= _T('f')) c -= _T('a') - 10;
+		else if (c >= _T('A') && c <= _T('F')) c -= _T('A') - 10;
+		else break;
+		value <<= 4;
+		value += c;
+	}
+
+	COLORREF result = (value & 0xff0000) >> 16;
+	result |= (value & 0xff00);
+	result |= (value & 0xff) << 16;
+	return result;
+}
 
 /*****************************************************
 * FUNCTION NAME: progress_callback
@@ -1417,74 +1447,34 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 			//         if(silent) sf(hDlg);
 			KillTimer(hDlg, 1);
 			DestroyWindow(hDlg);
+			if (bgBrush != NULL)
+			{
+				DeleteObject(bgBrush);
+				bgBrush = NULL;
+			}
 			break;
 		}
 		return false;
 	case WM_CTLCOLORSTATIC:
-    {
-		HDC hdcStatic = (HDC)wParam;
-		if (szTextColor != NULL && szTextColor[0] != 0)
+		if (bgColorSet && bgBrush != NULL)
 		{
-			unsigned int fgR, fgG, fgB;
-
-			fgR = fgG = fgB = 0;
-
-			#ifdef  UNICODE
-				swscanf_s(szTextColor, L"%02x%02x%02x", &fgR, &fgG, &fgB);
-			#else
-				sscanf_s(szTextColor, "%02x%02x%02x", &fgR, &fgG, &fgB);
-			#endif
-			SetTextColor(hdcStatic, RGB(fgR, fgG, fgB));
-		}
-		else
-			SetTextColor(hdcStatic, RGB(0, 0, 0));				// 0x000000
+			HDC hdcStatic = (HDC)wParam;
+			if (textColorSet)
+			{
+				SetTextColor(hdcStatic, textColor);
+			}
 		
-		SetBkMode(hdcStatic, TRANSPARENT);
-
-		if (szBgColor != NULL && szBgColor[0] != 0)
-		{
-			unsigned int bgR, bgG, bgB;
-
-			bgR = bgG = bgB = 0;
-
-			#ifdef  UNICODE
-				swscanf_s(szBgColor, L"%02x%02x%02x", &bgR, &bgG, &bgB);
-			#else
-				sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
-			#endif
-			SetBkColor(hdcStatic, RGB(bgR, bgG, bgB));
-			return (LONG)CreateSolidBrush(RGB(bgR, bgG, bgB));
+			SetBkColor(hdcStatic, bgColor);
+			return (INT_PTR)bgBrush;
 		}
-		else
-		{
-			SetBkColor(hdcStatic, RGB(244, 244, 244));
-			return (LONG)CreateSolidBrush(RGB(244, 244, 244));	// 0xF4F4F4
-		}
-    }
+		return false;
 	case WM_CTLCOLORDLG:
-	{
-		if (szBgColor != NULL && szBgColor[0] != 0)
+		if (bgColorSet && bgBrush != NULL)
 		{
-			unsigned int bgR, bgG, bgB;
-
-			bgR = bgG = bgB = 0;
-
-			#ifdef  UNICODE
-				swscanf_s(szBgColor, L"%02x%02x%02x", &bgR, &bgG, &bgB);
-			#else
-				sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
-			#endif
-			return (LONG)CreateSolidBrush(RGB(bgR, bgG, bgB));
+			return (INT_PTR)bgBrush;
 		}
-		else
-			return (LONG)CreateSolidBrush(RGB(244, 244, 244));	// 0xF4F4F4
-	}
+		return false;
 	default:
-		/*
-		LRESULT returnVal;
-		returnVal = DefWindowProc(hDlg, message, wParam, lParam);
-		return returnVal;
-		*/
 		return false;
 	}
 	return true;
@@ -1520,7 +1510,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 	myFtpCommand = NULL;
 	openType = INTERNET_OPEN_TYPE_PRECONFIG;
 	status = ST_CONNECTING;
-	*szCaption = *szCancel = *szUserAgent = *szBasic = *szAuth = *szTextColor = *szBgColor = 0;
+	*szCaption = *szCancel = *szUserAgent = *szBasic = *szAuth = 0;
 
 	url = (TCHAR*)LocalAlloc(LPTR, string_size * sizeof(TCHAR));
 	if(szPost)
@@ -1682,9 +1672,26 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 			CloseHandle(hFile);
 		}
 		else if(lstrcmpi(url, TEXT("/textcolor")) == 0)
-			popstring(szTextColor);
+		{
+			TCHAR szTextColor[7]=TEXT("");
+			popstringn(szTextColor, 7);
+			if (szTextColor != NULL && lstrlen(szTextColor) == 6)
+			{
+				textColor = parseColor(szTextColor);
+				textColorSet = true;
+			}
+		}
 		else if(lstrcmpi(url, TEXT("/bgcolor")) == 0)
-			popstring(szBgColor);
+		{
+			TCHAR szBgColor[7]=TEXT("");
+			popstringn(szBgColor, 7);
+			if (szBgColor != NULL && lstrlen(szBgColor) == 6)
+			{
+				bgColor = parseColor(szBgColor);
+				bgColorSet = true;
+				bgBrush = CreateSolidBrush(bgColor);
+			}
+		}
 	}
 	pushstring(url);
 //	if(*szCaption == 0) lstrcpy(szCaption, PLUGIN_NAME);
