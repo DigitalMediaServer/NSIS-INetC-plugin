@@ -1066,13 +1066,44 @@ void fsFormat(DWORD bfs, TCHAR *b)
 * SPECIAL CONSIDERATIONS:
 *
 *****************************************************/
-COLORREF parseColor(TCHAR *string)
+COLORREF parseColor(const TCHAR *string)
 {
-	unsigned long value = _tcstoul(string, NULL, 16);
+	unsigned long value = 0;
+
+	for (;;)
+	{
+		int c = *(string++);
+		if (c >= _T('0') && c <= _T('9')) c-=_T('0');
+		else if (c >= _T('a') && c <= _T('f')) c -= _T('a') - 10;
+		else if (c >= _T('A') && c <= _T('F')) c -= _T('A') - 10;
+		else break;
+		value <<= 4;
+		value += c;
+	}
+
 	COLORREF result = (value & 0xff0000) >> 16;
 	result |= (value & 0xff00);
 	result |= (value & 0xff) << 16;
 	return result;
+}
+
+/*****************************************************
+* FUNCTION NAME: myslen()
+* PURPOSE: 
+*    Find the length of a TCHAR without link errors.
+* SPECIAL CONSIDERATIONS:
+*
+*****************************************************/
+int myslen(const TCHAR *string)
+{
+	int len = 0;
+
+	for (;;)
+	{
+		if (*(string++) == 0) break;
+		len++;
+	}
+	return len;
 }
 
 /*****************************************************
@@ -1444,7 +1475,7 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		}
 		return false;
 	case WM_CTLCOLORSTATIC:
-		if (bgColorSet && bgBrush != NULL)		
+		if (bgColorSet && bgBrush != NULL)
 		{
 			HDC hdcStatic = (HDC)wParam;
 			if (textColorSet)
@@ -1457,7 +1488,7 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		}
 		return false;
 	case WM_CTLCOLORDLG:
-		if (bgColorSet && bgBrush != NULL)		
+		if (bgColorSet && bgBrush != NULL)
 		{
 			return (INT_PTR)bgBrush;
 		}
@@ -1662,8 +1693,8 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 		else if(lstrcmpi(url, TEXT("/textcolor")) == 0)
 		{
 			TCHAR szTextColor[7]=TEXT("");
-			popstringn(szTextColor, 7);			
-			if (szTextColor != NULL && _tcslen(szTextColor) == 6)
+			popstringn(szTextColor, 7);
+			if (szTextColor != NULL && myslen(szTextColor) == 6)
 			{
 				textColor = parseColor(szTextColor);
 				textColorSet = true;
@@ -1673,7 +1704,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 		{
 			TCHAR szBgColor[7]=TEXT("");
 			popstringn(szBgColor, 7);
-			if (szBgColor != NULL && _tcslen(szBgColor) == 6)
+			if (szBgColor != NULL && myslen(szBgColor) == 6)
 			{
 				bgColor = parseColor(szBgColor);
 				bgColorSet = true;
