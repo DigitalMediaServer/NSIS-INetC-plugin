@@ -1068,7 +1068,7 @@ void fsFormat(DWORD bfs, TCHAR *b)
 *****************************************************/
 COLORREF parseColor(TCHAR *string)
 {
-	unsigned int value = _tcstoul(string, NULL, 16);
+	unsigned long value = _tcstoul(string, NULL, 16);
 	COLORREF result = (value & 0xff0000) >> 16;
 	result |= (value & 0xff00);
 	result |= (value & 0xff) << 16;
