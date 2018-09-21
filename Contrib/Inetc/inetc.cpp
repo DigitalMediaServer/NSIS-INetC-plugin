@@ -145,7 +145,6 @@
 #include "resource.h"
 
 #include <string.h> // strstr etc
-#include <shlwapi.h>
 
 #ifndef PBM_SETMARQUEE
 #define PBM_SETMARQUEE (WM_USER + 10)
@@ -244,8 +243,7 @@ TCHAR fn[MAX_PATH]=TEXT(""),
 szCancel[64]=TEXT(""),
 szCaption[128]=TEXT(""),
 szUserAgent[256]=TEXT(""),
-szResume[256] = TEXT("Your internet connection seems to be unavailable!\nPlease reconnect and click Retry to resume."),
-*szRedirectTo = NULL;
+szResume[256] = TEXT("Your internet connection seems to be unavailable!\nPlease reconnect and click Retry to resume.");
 COLORREF textColor = 0, 
 bgColor = 0;
 bool textColorSet = false, 
@@ -495,36 +493,39 @@ bool queryStatus(HINTERNET hFile)
 		else if(lstrcmp(buf, TEXT("304")) == 0)
 			status = ERR_NOTMODIFIED;
 		else if(
-			lstrcmp(buf, TEXT("301")) == 0 || 
-			lstrcmp(buf, TEXT("302")) == 0 || 
-			lstrcmp(buf, TEXT("307")) == 0 || 
+			lstrcmp(buf, TEXT("301")) == 0 ||
+			lstrcmp(buf, TEXT("302")) == 0 ||
+			lstrcmp(buf, TEXT("307")) == 0 ||
 			lstrcmp(buf, TEXT("308")) == 0
 		) {
-			TCHAR location[INTERNET_MAX_URL_LENGTH] = TEXT(""); 
-			if(HttpQueryInfo(hFile, HTTP_QUERY_LOCATION, location, &(rslt = sizeof(location)), NULL))
+			TCHAR *location = (TCHAR*)LocalAlloc(LPTR, INTERNET_MAX_URL_LENGTH * sizeof(TCHAR));
+			if(HttpQueryInfo(hFile, HTTP_QUERY_LOCATION, location, &(rslt = sizeof(TCHAR) * INTERNET_MAX_URL_LENGTH), NULL))
 			{
 				if (_tcsstr(location, TEXT(":")) == NULL)
 				{
 					// Relative URL
-					TCHAR relativeLocation[INTERNET_MAX_URL_LENGTH] = TEXT("");
+					TCHAR *p = (TCHAR*)LocalAlloc(LPTR, INTERNET_MAX_URL_LENGTH * sizeof(TCHAR));
 					DWORD len;
-					lstrcpy(relativeLocation, location);
-					if (UrlCombine(url, relativeLocation, location, &(len = sizeof(relativeLocation)), 0) != S_OK)
+					lstrcpy(p, location);
+					if (UrlCombine(url, p, location, &(len = sizeof(TCHAR) * INTERNET_MAX_URL_LENGTH), 0) != S_OK)
 					{
 						status = ERR_REL_REDIRECTION;
 						wsprintf(szStatus[status] + lstrlen(szStatus[status]), TEXT(" (%s)"), buf);
+						LocalFree(p);
+						LocalFree(location);
 						return true;
 					}
+					LocalFree(p);
 				}
 				if (nossl && _tcsstr(location, TEXT("https:")) == location) {
 					// Replace https: with http:
-					TCHAR newLocation[INTERNET_MAX_URL_LENGTH] = TEXT("http:");
-					lstrcat(newLocation, &location[6]);
-					lstrcpy(location, newLocation);
+					TCHAR *p = (TCHAR*)LocalAlloc(LPTR, INTERNET_MAX_URL_LENGTH * sizeof(TCHAR));
+					lstrcat(p, &location[6]);
+					lstrcpy(location, p);
+					LocalFree(p);
 				}
-				LocalFree(url);				
-				url = (TCHAR*)LocalAlloc(LPTR, INTERNET_MAX_URL_LENGTH * sizeof(TCHAR));
-				lstrcpy(url, location);
+				LocalFree(url);
+				url = location;
 				status = ST_REDIRECT;
 				return false;
 			}
@@ -533,6 +534,7 @@ bool queryStatus(HINTERNET hFile)
 				status = ERR_REDIRECTION;
 				wsprintf(szStatus[status] + lstrlen(szStatus[status]), TEXT(" (%s)"), buf);
 			}
+			LocalFree(location);
 		}
 		else if(*buf == TEXT('3'))
 		{
@@ -992,7 +994,7 @@ crackURL:
 							if(status == ST_REDIRECT)
 							{
 								goto crackURL;
-							}							
+							}
 							if(hFile != NULL)
 							{
 								if(fhead)
@@ -1135,25 +1137,6 @@ COLORREF parseColor(const TCHAR *string)
 	result |= (value & 0xff00);
 	result |= (value & 0xff) << 16;
 	return result;
-}
-
-/*****************************************************
-* FUNCTION NAME: myslen()
-* PURPOSE: 
-*    Find the length of a TCHAR without link errors.
-* SPECIAL CONSIDERATIONS:
-*
-*****************************************************/
-int myslen(const TCHAR *string) //TODO: (Nad) lstrlen
-{
-	int len = 0;
-
-	for (;;)
-	{
-		if (*(string++) == 0) break;
-		len++;
-	}
-	return len;
 }
 
 /*****************************************************
@@ -1746,7 +1729,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 		{
 			TCHAR szTextColor[7]=TEXT("");
 			popstringn(szTextColor, 7);
-			if (szTextColor != NULL && myslen(szTextColor) == 6)
+			if (szTextColor != NULL && lstrlen(szTextColor) == 6)
 			{
 				textColor = parseColor(szTextColor);
 				textColorSet = true;
@@ -1756,7 +1739,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 		{
 			TCHAR szBgColor[7]=TEXT("");
 			popstringn(szBgColor, 7);
-			if (szBgColor != NULL && myslen(szBgColor) == 6)
+			if (szBgColor != NULL && lstrlen(szBgColor) == 6)
 			{
 				bgColor = parseColor(szBgColor);
 				bgColorSet = true;
