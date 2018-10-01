@@ -134,6 +134,9 @@
 * Nadahar
 *     Sep 21, 2018 - 1.0.5.5
 *              Created /NOSSL option that prevents redirects to HTTPS (which breaks Windows XP)
+* anders_k
+*     Sep 24, 2018 - 1.0.5.6 - 
+*              /tostackconv supports UTF-8 and UTF-16LE BOM sniffing and conversion.
 *******************************************************/
 
 
@@ -148,7 +151,6 @@
 #include "resource.h"
 
 #include <string.h> // strstr etc
-#include <iostream> // sscanf
 
 #ifndef PBM_SETMARQUEE
 #define PBM_SETMARQUEE (WM_USER + 10)
@@ -185,6 +187,7 @@ FTP_CMD myFtpCommand;
 
 //#define MY_WEAKSECURITY_CERT_FLAGS SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_REVOCATION | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID | SECURITY_FLAG_IGNORE_CERT_CN_INVALID
 #define MY_WEAKSECURITY_CERT_FLAGS INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTP
+#define MY_REDIR_FLAGS INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTP | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS
 #define MY_HTTPS_FLAGS (INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS | INTERNET_FLAG_SECURE)
 
 enum STATUS_CODES {
@@ -247,18 +250,12 @@ TCHAR fn[MAX_PATH]=TEXT(""),
 szCancel[64]=TEXT(""),
 szCaption[128]=TEXT(""),
 szUserAgent[256]=TEXT(""),
-<<<<<<< HEAD
-szTextColor[64]={ 0 },
-szBgColor[64]={ 0 },
-szResume[256] = TEXT("Your internet connection seems to be not permitted or dropped out!\nPlease reconnect and click Retry to resume installation.");
-=======
-szResume[256] = TEXT("Your internet connection seems to be unavailable!\nPlease reconnect and click Retry to resume.");
+szResume[256] = TEXT("Your Internet connection seems to be unavailable!\nPlease reconnect and click Retry to resume.");
 COLORREF textColor = 0, 
 bgColor = 0;
 bool textColorSet = false, 
 bgColorSet = false;
 HBRUSH bgBrush = NULL;
->>>>>>> upstream/master
 CHAR *szPost = NULL,
 post_fname[MAX_PATH] = "";
 DWORD fSize = 0;
@@ -439,7 +436,10 @@ void fileTransfer(HANDLE localFile,
 			if(szToStack)
 			{
 				for (DWORD i = 0; cntToStack < g_stringsize && i < rslt; i++, cntToStack++)
-					*(szToStack + cntToStack) = data_buf[i];
+					if (convToStack)
+						*((BYTE*)szToStack + cntToStack) = data_buf[i]; // Bytes
+					else
+						*(szToStack + cntToStack) = data_buf[i]; // ? to TCHARs
 			}
 			else if(!WriteFile(localFile, data_buf, rslt, &bytesDone, NULL) ||
 				rslt != bytesDone)
@@ -1015,7 +1015,7 @@ crackURL:
 										if(szToStack)
 										{
 											for (DWORD i = 0; cntToStack < g_stringsize && i < rslt; i++, cntToStack++)
-												*(szToStack + cntToStack) = hdr[i];
+												*(szToStack + cntToStack) = hdr[i]; // ASCII to TCHAR
 										}
 										else
 										{
@@ -1463,12 +1463,13 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		return false;
 	case WM_PAINT:
 		// child dialog redraw problem. return false is important
-		RedrawWindow(GetDlgItem(hDlg, IDC_STATIC1), NULL, NULL, RDW_INVALIDATE);
-		RedrawWindow(GetDlgItem(hDlg, IDCANCEL), NULL, NULL, RDW_INVALIDATE);
-		RedrawWindow(GetDlgItem(hDlg, IDC_PROGRESS1), NULL, NULL, RDW_INVALIDATE);
-		UpdateWindow(GetDlgItem(hDlg, IDC_STATIC1));
-		UpdateWindow(GetDlgItem(hDlg, IDCANCEL));
-		UpdateWindow(GetDlgItem(hDlg, IDC_PROGRESS1));
+		HWND hS1 = GetDlgItem(hDlg, IDC_STATIC1), hC = GetDlgItem(hDlg, IDCANCEL), hP1 = GetDlgItem(hDlg, IDC_PROGRESS1);
+		RedrawWindow(hS1, NULL, NULL, RDW_INVALIDATE);
+		RedrawWindow(hC, NULL, NULL, RDW_INVALIDATE);
+		RedrawWindow(hP1, NULL, NULL, RDW_INVALIDATE);
+		UpdateWindow(hS1);
+		UpdateWindow(hC);
+		UpdateWindow(hP1);
 		return false;
 	case WM_TIMER:
 		if(!silent && IsWindow(hDlg))
@@ -1519,66 +1520,6 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		}
 		return false;
 	case WM_CTLCOLORSTATIC:
-<<<<<<< HEAD
-    {
-		HDC hdcStatic = (HDC)wParam;
-		if (szTextColor != NULL && szTextColor[0] != 0)
-		{
-			unsigned int fgR, fgG, fgB;
-
-			fgR = fgG = fgB = 0;
-
-			#ifdef  UNICODE
-				swscanf_s(szTextColor, L"%02x%02x%02x", &fgR, &fgG, &fgB);
-			#else
-				sscanf_s(szTextColor, "%02x%02x%02x", &fgR, &fgG, &fgB);
-			#endif
-			SetTextColor(hdcStatic, RGB(fgR, fgG, fgB));
-		}
-		else
-			SetTextColor(hdcStatic, RGB(0, 0, 0));				// 0x000000
-		
-		SetBkMode(hdcStatic, TRANSPARENT);
-
-		if (szBgColor != NULL && szBgColor[0] != 0)
-		{
-			unsigned int bgR, bgG, bgB;
-
-			bgR = bgG = bgB = 0;
-
-			#ifdef  UNICODE
-				swscanf_s(szBgColor, L"%02x%02x%02x", &bgR, &bgG, &bgB);
-			#else
-				sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
-			#endif
-			SetBkColor(hdcStatic, RGB(bgR, bgG, bgB));
-			return (LONG)CreateSolidBrush(RGB(bgR, bgG, bgB));
-		}
-		else
-		{
-			SetBkColor(hdcStatic, RGB(244, 244, 244));
-			return (LONG)CreateSolidBrush(RGB(244, 244, 244));	// 0xF4F4F4
-		}
-    }
-	case WM_CTLCOLORDLG:
-	{
-		if (szBgColor != NULL && szBgColor[0] != 0)
-		{
-			unsigned int bgR, bgG, bgB;
-
-			bgR = bgG = bgB = 0;
-
-			#ifdef  UNICODE
-				swscanf_s(szBgColor, L"%02x%02x%02x", &bgR, &bgG, &bgB);
-			#else
-				sscanf_s(szBgColor, "%02x%02x%02x", &bgR, &bgG, &bgB);
-			#endif
-			return (LONG)CreateSolidBrush(RGB(bgR, bgG, bgB));
-		}
-		else
-			return (LONG)CreateSolidBrush(RGB(244, 244, 244));	// 0xF4F4F4
-	}
-=======
 		if (bgColorSet && bgBrush != NULL)
 		{
 			HDC hdcStatic = (HDC)wParam;
@@ -1597,13 +1538,7 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 			return (INT_PTR)bgBrush;
 		}
 		return false;
->>>>>>> upstream/master
 	default:
-		/*
-		LRESULT returnVal;
-		returnVal = DefWindowProc(hDlg, message, wParam, lParam);
-		return returnVal;
-		*/
 		return false;
 	}
 	return true;
@@ -1639,7 +1574,7 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 	myFtpCommand = NULL;
 	openType = INTERNET_OPEN_TYPE_PRECONFIG;
 	status = ST_CONNECTING;
-	*szCaption = *szCancel = *szUserAgent = *szBasic = *szAuth = *szTextColor = *szBgColor = 0;
+	*szCaption = *szCancel = *szUserAgent = *szBasic = *szAuth = 0;
 
 	url = (TCHAR*)LocalAlloc(LPTR, string_size * sizeof(TCHAR));
 	if(szPost)
@@ -1803,11 +1738,6 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 			CloseHandle(hFile);
 		}
 		else if(lstrcmpi(url, TEXT("/textcolor")) == 0)
-<<<<<<< HEAD
-			popstring(szTextColor);
-		else if(lstrcmpi(url, TEXT("/bgcolor")) == 0)
-			popstring(szBgColor);
-=======
 		{
 			TCHAR szTextColor[7]=TEXT("");
 			popstringn(szTextColor, 7);
@@ -1828,7 +1758,6 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 				bgBrush = CreateSolidBrush(bgColor);
 			}
 		}
->>>>>>> upstream/master
 	}
 	pushstring(url);
 //	if(*szCaption == 0) lstrcpy(szCaption, PLUGIN_NAME);
@@ -1948,13 +1877,20 @@ cleanup:
 		if(cntToStack > 0 && convToStack)
 		{
 #ifdef UNICODE
-			int required = MultiByteToWideChar(CP_ACP, 0, (CHAR*)szToStack, string_size * sizeof(TCHAR), NULL, 0);
+			int cp = CP_ACP;
+			if (0xef == ((BYTE*)szToStack)[0] && 0xbb == ((BYTE*)szToStack)[1] && 0xbf == ((BYTE*)szToStack)[2]) cp = 65001; // CP_UTF8
+			if (0xff == ((BYTE*)szToStack)[0] && 0xfe == ((BYTE*)szToStack)[1])
+			{
+				cp = 1200; // UTF-16LE
+				pushstring((LPWSTR)szToStack);
+			}
+			int required = (cp == 1200) ? 0 : MultiByteToWideChar(cp, 0, (CHAR*)szToStack, string_size * sizeof(TCHAR), NULL, 0);
 			if(required > 0)
 			{
 				WCHAR* pszToStackNew = (WCHAR*)LocalAlloc(LPTR, sizeof(WCHAR) * (required + 1));
 				if(pszToStackNew)
 				{
-					if(MultiByteToWideChar(CP_ACP, 0, (CHAR*)szToStack, string_size * sizeof(TCHAR), pszToStackNew, required) > 0)
+					if(MultiByteToWideChar(cp, 0, (CHAR*)szToStack, string_size * sizeof(TCHAR), pszToStackNew, required) > 0)
 						pushstring(pszToStackNew);
 					LocalFree(pszToStackNew);
 				}
