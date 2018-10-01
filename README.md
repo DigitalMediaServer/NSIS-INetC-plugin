@@ -6,8 +6,8 @@ The [INetC (Internet client) plug-in][1] is a [NSIS][2] plugin downloading and u
 [NSIS (Nullsoft Scriptable Install System)][2] is a professional open source system to create Windows installers.
 It is designed to be as small and flexible as possible and is therefore very suitable for internet distribution.
 
-This is a modified version of `1.0.5.2`. Since I couldn't find a source repository, I've created a Git repository and 
-committed the downloaded source files. These changes would otherwise have been submitted as a pull request or patch.
+This is a modified version of `1.0.5.3`. Since I couldn't find a source repository, I've created a Git repository and 
+committed the downloaded source files. These changes would otherwise have been submitted as a pull request or patch. 
 I couldn't find an explicit license for [INetC plug-in][1], which means that this is licensed implicitly with the `zLib License`
 according to the [NSIS license][3].
 

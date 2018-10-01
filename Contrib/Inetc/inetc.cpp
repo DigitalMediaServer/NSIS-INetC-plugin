@@ -134,6 +134,9 @@
 * Nadahar
 *     Sep 21, 2018 - 1.0.5.5
 *              Created /NOSSL option that prevents redirects to HTTPS (which breaks Windows XP)
+* anders_k
+*     Sep 24, 2018 - 1.0.5.6 - 
+*              /tostackconv supports UTF-8 and UTF-16LE BOM sniffing and conversion.
 *******************************************************/
 
 
@@ -183,8 +186,9 @@ FTP_CMD myFtpCommand;
 #define PROXY_AUTH_HDR TEXT("Proxy-authorization: basic %s")
 
 //#define MY_WEAKSECURITY_CERT_FLAGS SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_REVOCATION | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID | SECURITY_FLAG_IGNORE_CERT_CN_INVALID
-#define MY_WEAKSECURITY_CERT_FLAGS INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTP
-#define MY_HTTPS_FLAGS (INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS | INTERNET_FLAG_SECURE)
+#define MY_WEAKSECURITY_CERT_FLAGS INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID
+#define MY_REDIR_FLAGS INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTP | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS
+#define MY_HTTPS_FLAGS (MY_REDIR_FLAGS | INTERNET_FLAG_SECURE)
 
 enum STATUS_CODES {
 	ST_OK = 0,
@@ -246,7 +250,7 @@ TCHAR fn[MAX_PATH]=TEXT(""),
 szCancel[64]=TEXT(""),
 szCaption[128]=TEXT(""),
 szUserAgent[256]=TEXT(""),
-szResume[256] = TEXT("Your internet connection seems to be unavailable!\nPlease reconnect and click Retry to resume.");
+szResume[256] = TEXT("Your Internet connection seems to be unavailable!\nPlease reconnect and click Retry to resume.");
 COLORREF textColor = 0, 
 bgColor = 0;
 bool textColorSet = false, 
@@ -432,7 +436,10 @@ void fileTransfer(HANDLE localFile,
 			if(szToStack)
 			{
 				for (DWORD i = 0; cntToStack < g_stringsize && i < rslt; i++, cntToStack++)
-					*(szToStack + cntToStack) = data_buf[i];
+					if (convToStack)
+						*((BYTE*)szToStack + cntToStack) = data_buf[i]; // Bytes
+					else
+						*(szToStack + cntToStack) = data_buf[i]; // ? to TCHARs
 			}
 			else if(!WriteFile(localFile, data_buf, rslt, &bytesDone, NULL) ||
 				rslt != bytesDone)
@@ -1008,7 +1015,7 @@ crackURL:
 										if(szToStack)
 										{
 											for (DWORD i = 0; cntToStack < g_stringsize && i < rslt; i++, cntToStack++)
-												*(szToStack + cntToStack) = hdr[i];
+												*(szToStack + cntToStack) = hdr[i]; // ASCII to TCHAR
 										}
 										else
 										{
@@ -1448,6 +1455,8 @@ void onInitDlg(HWND hDlg)
 *****************************************************/
 INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 {
+	HWND hS1 = GetDlgItem(hDlg, IDC_STATIC1), hC = GetDlgItem(hDlg, IDCANCEL), hP1 = GetDlgItem(hDlg, IDC_PROGRESS1), \
+		 hMDT = GetDlgItem(hDlg, IDC_MODERN_DOWNLOADED_TEXT), hMRT = GetDlgItem(hDlg, IDC_MODERN_REMAINING_TEXT), hMST = GetDlgItem(hDlg, IDC_MODERN_SPEED_TEXT);
 	switch(message)
 	{
 	case WM_INITDIALOG:
@@ -1456,12 +1465,12 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		return false;
 	case WM_PAINT:
 		// child dialog redraw problem. return false is important
-		RedrawWindow(GetDlgItem(hDlg, IDC_STATIC1), NULL, NULL, RDW_INVALIDATE);
-		RedrawWindow(GetDlgItem(hDlg, IDCANCEL), NULL, NULL, RDW_INVALIDATE);
-		RedrawWindow(GetDlgItem(hDlg, IDC_PROGRESS1), NULL, NULL, RDW_INVALIDATE);
-		UpdateWindow(GetDlgItem(hDlg, IDC_STATIC1));
-		UpdateWindow(GetDlgItem(hDlg, IDCANCEL));
-		UpdateWindow(GetDlgItem(hDlg, IDC_PROGRESS1));
+		RedrawWindow(hS1, NULL, NULL, RDW_INVALIDATE);
+		RedrawWindow(hC, NULL, NULL, RDW_INVALIDATE);
+		RedrawWindow(hP1, NULL, NULL, RDW_INVALIDATE);
+		UpdateWindow(hS1);
+		UpdateWindow(hC);
+		UpdateWindow(hP1);
 		return false;
 	case WM_TIMER:
 		if(!silent && IsWindow(hDlg))
@@ -1472,17 +1481,17 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 			if(modernPopup)
 			{
 				onTimerModern(hDlg);
-				RedrawWindow(GetDlgItem(hDlg, IDC_MODERN_DOWNLOADED_TEXT), NULL, NULL, RDW_INVALIDATE);
-				RedrawWindow(GetDlgItem(hDlg, IDC_MODERN_REMAINING_TEXT), NULL, NULL, RDW_INVALIDATE);
-				RedrawWindow(GetDlgItem(hDlg, IDC_MODERN_SPEED_TEXT), NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(hMDT, NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(hMRT, NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(hMST, NULL, NULL, RDW_INVALIDATE);
 			} 
 			else
 			{
 				if(popup) onTimer(hDlg);
 				else progress_callback();
-				RedrawWindow(GetDlgItem(hDlg, IDC_STATIC1), NULL, NULL, RDW_INVALIDATE);
-				RedrawWindow(GetDlgItem(hDlg, IDCANCEL), NULL, NULL, RDW_INVALIDATE);
-				RedrawWindow(GetDlgItem(hDlg, IDC_PROGRESS1), NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(hS1, NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(hC, NULL, NULL, RDW_INVALIDATE);
+				RedrawWindow(hP1, NULL, NULL, RDW_INVALIDATE);
 			}
 		}
 		break;
@@ -1869,13 +1878,20 @@ cleanup:
 		if(cntToStack > 0 && convToStack)
 		{
 #ifdef UNICODE
-			int required = MultiByteToWideChar(CP_ACP, 0, (CHAR*)szToStack, string_size * sizeof(TCHAR), NULL, 0);
+			int cp = CP_ACP;
+			if (0xef == ((BYTE*)szToStack)[0] && 0xbb == ((BYTE*)szToStack)[1] && 0xbf == ((BYTE*)szToStack)[2]) cp = 65001; // CP_UTF8
+			if (0xff == ((BYTE*)szToStack)[0] && 0xfe == ((BYTE*)szToStack)[1])
+			{
+				cp = 1200; // UTF-16LE
+				pushstring((LPWSTR)szToStack);
+			}
+			int required = (cp == 1200) ? 0 : MultiByteToWideChar(cp, 0, (CHAR*)szToStack, string_size * sizeof(TCHAR), NULL, 0);
 			if(required > 0)
 			{
 				WCHAR* pszToStackNew = (WCHAR*)LocalAlloc(LPTR, sizeof(WCHAR) * (required + 1));
 				if(pszToStackNew)
 				{
-					if(MultiByteToWideChar(CP_ACP, 0, (CHAR*)szToStack, string_size * sizeof(TCHAR), pszToStackNew, required) > 0)
+					if(MultiByteToWideChar(cp, 0, (CHAR*)szToStack, string_size * sizeof(TCHAR), pszToStackNew, required) > 0)
 						pushstring(pszToStackNew);
 					LocalFree(pszToStackNew);
 				}
