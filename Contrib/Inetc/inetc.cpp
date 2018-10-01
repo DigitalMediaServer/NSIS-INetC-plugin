@@ -131,6 +131,9 @@
 * Nadahar
 *     Mar 08, 2018 - 1.0.5.4
 *              Created 4. download dialog option: /modernpopup
+* Nadahar
+*     Sep 21, 2018 - 1.0.5.5
+*              Created /NOSSL option that prevents redirects to HTTPS (which breaks Windows XP)
 *******************************************************/
 
 
@@ -139,6 +142,7 @@
 #include <windows.h>
 //#include <tchar.h>
 #include <wininet.h>
+#include <shlwapi.h>
 #include <commctrl.h>
 #include "pluginapi.h"
 #include "resource.h"
@@ -180,9 +184,8 @@ FTP_CMD myFtpCommand;
 #define PROXY_AUTH_HDR TEXT("Proxy-authorization: basic %s")
 
 //#define MY_WEAKSECURITY_CERT_FLAGS SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_REVOCATION | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID | SECURITY_FLAG_IGNORE_CERT_CN_INVALID
-#define MY_WEAKSECURITY_CERT_FLAGS SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_REVOCATION
-#define MY_REDIR_FLAGS INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTP | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS
-#define MY_HTTPS_FLAGS (MY_REDIR_FLAGS | INTERNET_FLAG_SECURE)
+#define MY_WEAKSECURITY_CERT_FLAGS INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTP
+#define MY_HTTPS_FLAGS (INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS | INTERNET_FLAG_SECURE)
 
 enum STATUS_CODES {
 	ST_OK = 0,
@@ -192,6 +195,7 @@ enum STATUS_CODES {
 	ST_URLOPEN,
 	// ST_OPENING,
 	ST_PAUSE,
+	ST_REDIRECT,
 	ERR_TERMINATED,
 	ERR_DIALOG,
 	ERR_INETOPEN,
@@ -216,19 +220,20 @@ enum STATUS_CODES {
 	ERR_CREATEDIR,
 	ERR_PATH,
 	ERR_NOTMODIFIED,
-	ERR_REDIRECTION
+	ERR_REDIRECTION,
+	ERR_REL_REDIRECTION
 };
 
 
-static TCHAR szStatus[][32] = {
+static TCHAR szStatus[][34] = {
 	TEXT("OK"),TEXT("Connecting"),TEXT("Downloading"),TEXT("Cancelled"),TEXT("Connecting"), //TEXT("Opening URL")),
-	TEXT("Reconnect Pause"),TEXT("Terminated"),TEXT("Dialog Error"),TEXT("Open Internet Error"),
+	TEXT("Reconnect Pause"),TEXT("Redirecting"),TEXT("Terminated"),TEXT("Dialog Error"),TEXT("Open Internet Error"),
 	TEXT("Open URL Error"),TEXT("Transfer Error"),TEXT("File Open Error"),TEXT("File Write Error"),TEXT("File Read Error"),
 	TEXT("Reget Error"),TEXT("Connection Error"),TEXT("OpenRequest Error"),TEXT("SendRequest Error"),
 	TEXT("URL Parts Error"),TEXT("File Not Found (404)"),TEXT("CreateThread Error"),TEXT("Proxy Error (407)"),
 	TEXT("Access Forbidden (403)"),TEXT("Not Allowed (405)"),TEXT("Request Error"),TEXT("Server Error"),
 	TEXT("Unauthorized (401)"),TEXT("FtpCreateDir failed (550)"),TEXT("Error FTP path (550)"),TEXT("Not Modified"), 
-	TEXT("Redirection")
+	TEXT("Redirection Error"), TEXT("Relative Redirection Error")
 };
 
 HINSTANCE g_hInstance;
@@ -242,9 +247,18 @@ TCHAR fn[MAX_PATH]=TEXT(""),
 szCancel[64]=TEXT(""),
 szCaption[128]=TEXT(""),
 szUserAgent[256]=TEXT(""),
+<<<<<<< HEAD
 szTextColor[64]={ 0 },
 szBgColor[64]={ 0 },
 szResume[256] = TEXT("Your internet connection seems to be not permitted or dropped out!\nPlease reconnect and click Retry to resume installation.");
+=======
+szResume[256] = TEXT("Your internet connection seems to be unavailable!\nPlease reconnect and click Retry to resume.");
+COLORREF textColor = 0, 
+bgColor = 0;
+bool textColorSet = false, 
+bgColorSet = false;
+HBRUSH bgBrush = NULL;
+>>>>>>> upstream/master
 CHAR *szPost = NULL,
 post_fname[MAX_PATH] = "";
 DWORD fSize = 0;
@@ -257,7 +271,7 @@ fs = 0,
 timeout = 0,
 receivetimeout = 0;
 DWORD startTime, transfStart, openType;
-bool silent, popup, modernPopup, resume, nocancel, noproxy, nocookies, convToStack, g_ignorecertissues;
+bool silent, popup, modernPopup, resume, nocancel, noproxy, nocookies, convToStack, g_ignorecertissues, nossl;
 
 HWND childwnd;
 HWND hDlg;
@@ -448,9 +462,9 @@ void fileTransfer(HANDLE localFile,
 *****************************************************/
 int mySendRequest(HINTERNET hFile)
 {
-	INTERNET_BUFFERS BufferIn = {0};
 	if(fput)
 	{
+		INTERNET_BUFFERS BufferIn = {0};
 		BufferIn.dwStructSize = sizeof( INTERNET_BUFFERS );
 		BufferIn.dwBufferTotal = fs;
 		return HttpSendRequestEx( hFile, &BufferIn, NULL, HSR_INITIATE, 0);
@@ -488,6 +502,51 @@ bool queryStatus(HINTERNET hFile)
 			status = ERR_NOTALLOWED;
 		else if(lstrcmp(buf, TEXT("304")) == 0)
 			status = ERR_NOTMODIFIED;
+		else if(
+			lstrcmp(buf, TEXT("301")) == 0 ||
+			lstrcmp(buf, TEXT("302")) == 0 ||
+			lstrcmp(buf, TEXT("307")) == 0 ||
+			lstrcmp(buf, TEXT("308")) == 0
+		) {
+			TCHAR *location = (TCHAR*)LocalAlloc(LPTR, (INTERNET_MAX_URL_LENGTH + 1) * sizeof(TCHAR));
+			if(HttpQueryInfo(hFile, HTTP_QUERY_LOCATION, location, &(rslt = sizeof(TCHAR) * INTERNET_MAX_URL_LENGTH), NULL))
+			{
+				if (_tcsstr(location, TEXT(":")) == NULL)
+				{
+					// Relative URL
+					TCHAR *p = (TCHAR*)LocalAlloc(LPTR, (INTERNET_MAX_URL_LENGTH + 1) * sizeof(TCHAR));
+					DWORD len;
+					lstrcpy(p, location);
+					if (UrlCombine(url, p, location, &(len = sizeof(TCHAR) * INTERNET_MAX_URL_LENGTH), 0) != S_OK)
+					{
+						status = ERR_REL_REDIRECTION;
+						wsprintf(szStatus[status] + lstrlen(szStatus[status]), TEXT(" (%s)"), buf);
+						LocalFree(p);
+						LocalFree(location);
+						return true;
+					}
+					LocalFree(p);
+				}
+				if (nossl && _tcsstr(location, TEXT("https:")) == location) {
+					// Replace https: with http:
+					TCHAR *p = (TCHAR*)LocalAlloc(LPTR, (INTERNET_MAX_URL_LENGTH + 1) * sizeof(TCHAR));
+					lstrcpy(p, TEXT("http:"));
+					lstrcat(p, &location[6]);
+					lstrcpy(location, p);
+					LocalFree(p);
+				}
+				LocalFree(url);
+				url = location;
+				status = ST_REDIRECT;
+				return false;
+			}
+			else
+			{
+				status = ERR_REDIRECTION;
+				wsprintf(szStatus[status] + lstrlen(szStatus[status]), TEXT(" (%s)"), buf);
+			}
+			LocalFree(location);
+		}
 		else if(*buf == TEXT('3'))
 		{
 			status = ERR_REDIRECTION;
@@ -732,8 +791,8 @@ resend_auth1:
 // request itself
 	if(status == ST_URLOPEN)
 	{
-		DWORD secflags = nScheme == INTERNET_SCHEME_HTTPS ? MY_HTTPS_FLAGS : 0;
-		if (Option_IgnoreCertIssues()) secflags |= MY_WEAKSECURITY_CERT_FLAGS;
+		DWORD secflags = nossl ? INTERNET_FLAG_NO_AUTO_REDIRECT : nScheme == INTERNET_SCHEME_HTTPS ? MY_HTTPS_FLAGS : 0;
+		if (!nossl && Option_IgnoreCertIssues()) secflags |= MY_WEAKSECURITY_CERT_FLAGS;
 		DWORD cokflags = nocookies ? (INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_NO_COOKIES) : 0;
 		if((hFile = HttpOpenRequest(hConn, fput ? TEXT("PUT") : (fhead ? TEXT("HEAD") : (szPost ? TEXT("POST") : NULL)),
 			path, NULL, NULL, NULL,
@@ -855,14 +914,14 @@ DWORD __stdcall inetTransfer(void *hw)
 	DWORD lastCnt, rslt, err;
 	static TCHAR hdr[2048];
 	TCHAR *host = (TCHAR*)LocalAlloc(LPTR, g_stringsize * sizeof(TCHAR)),
-		*path = (TCHAR*)LocalAlloc(LPTR, g_stringsize * sizeof(TCHAR)),
+		*path = (TCHAR*)LocalAlloc(LPTR, INTERNET_MAX_URL_LENGTH * sizeof(TCHAR)),
 		*params = (TCHAR*)LocalAlloc(LPTR, g_stringsize * sizeof(TCHAR)),
 		*user = (TCHAR*)LocalAlloc(LPTR, g_stringsize * sizeof(TCHAR)),
 		*passwd = (TCHAR*)LocalAlloc(LPTR, g_stringsize * sizeof(TCHAR));
 
 	URL_COMPONENTS uc = {sizeof(URL_COMPONENTS), NULL, 0,
 		(INTERNET_SCHEME)0, host, g_stringsize, 0 , user, g_stringsize,
-		passwd, g_stringsize, path, g_stringsize, params, g_stringsize};
+		passwd, g_stringsize, path, INTERNET_MAX_URL_LENGTH, params, g_stringsize};
 
 	if((hSes = InternetOpen(szUserAgent, openType, szProxy, NULL, 0)) != NULL)
 	{
@@ -892,17 +951,19 @@ DWORD __stdcall inetTransfer(void *hw)
 			//         sf(hDlg);
 			if(popstring(fn) != 0 || lstrcmpi(url, TEXT("/end")) == 0) break;
 			status = ST_CONNECTING;
-			cnt = fs = *host = *user = *passwd = *path = *params = 0;
+			cnt = fs = 0;
 			PostMessage(hDlg, WM_TIMER, 1, 0); // show url & fn, do it sync
 			if(szToStack || (localFile = CreateFile(fn, fput ? GENERIC_READ : GENERIC_WRITE, FILE_SHARE_READ,
 				NULL, fput ? OPEN_EXISTING : CREATE_ALWAYS, 0, NULL)) != INVALID_HANDLE_VALUE)
 			{
-				uc.dwHostNameLength = uc.dwUserNameLength = uc.dwPasswordLength =
-					uc.dwUrlPathLength = uc.dwExtraInfoLength = g_stringsize;
 				if(fput)
 				{
 					fs = GetFileSize(localFile, NULL);
 				}
+crackURL:
+				*host = *user = *passwd = *path = *params = 0;
+				uc.dwHostNameLength = uc.dwUserNameLength = uc.dwPasswordLength = uc.dwExtraInfoLength = g_stringsize;
+				uc.dwUrlPathLength = INTERNET_MAX_URL_LENGTH;
 				if(InternetCrackUrl(url, 0, 0/*ICU_ESCAPE*/ , &uc))
 				{
 					// auth headers for HTTP PUT seems to be lost, preparing encoded login:password
@@ -940,6 +1001,10 @@ DWORD __stdcall inetTransfer(void *hw)
 							{
 								InternetCloseHandle(hFile);
 								hFile = NULL;
+							}
+							if(status == ST_REDIRECT)
+							{
+								goto crackURL;
 							}
 							if(hFile != NULL)
 							{
@@ -1056,6 +1121,34 @@ void fsFormat(DWORD bfs, TCHAR *b)
 	else wsprintf(b, TEXT("%u MB"), (bfs / 1024 / 1024));
 }
 
+/*****************************************************
+* FUNCTION NAME: parseColor()
+* PURPOSE: 
+*    Parse a COLORREF from a string containing a 
+*    hexadecimal RRGGBB value.
+* SPECIAL CONSIDERATIONS:
+*
+*****************************************************/
+COLORREF parseColor(const TCHAR *string)
+{
+	unsigned long value = 0;
+
+	for (;;)
+	{
+		int c = *(string++);
+		if (c >= _T('0') && c <= _T('9')) c-=_T('0');
+		else if (c >= _T('a') && c <= _T('f')) c -= _T('a') - 10;
+		else if (c >= _T('A') && c <= _T('F')) c -= _T('A') - 10;
+		else break;
+		value <<= 4;
+		value += c;
+	}
+
+	COLORREF result = (value & 0xff0000) >> 16;
+	result |= (value & 0xff00);
+	result |= (value & 0xff) << 16;
+	return result;
+}
 
 /*****************************************************
 * FUNCTION NAME: progress_callback
@@ -1417,10 +1510,16 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 			//         if(silent) sf(hDlg);
 			KillTimer(hDlg, 1);
 			DestroyWindow(hDlg);
+			if (bgBrush != NULL)
+			{
+				DeleteObject(bgBrush);
+				bgBrush = NULL;
+			}
 			break;
 		}
 		return false;
 	case WM_CTLCOLORSTATIC:
+<<<<<<< HEAD
     {
 		HDC hdcStatic = (HDC)wParam;
 		if (szTextColor != NULL && szTextColor[0] != 0)
@@ -1479,6 +1578,26 @@ INT_PTR CALLBACK dlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam )
 		else
 			return (LONG)CreateSolidBrush(RGB(244, 244, 244));	// 0xF4F4F4
 	}
+=======
+		if (bgColorSet && bgBrush != NULL)
+		{
+			HDC hdcStatic = (HDC)wParam;
+			if (textColorSet)
+			{
+				SetTextColor(hdcStatic, textColor);
+			}
+		
+			SetBkColor(hdcStatic, bgColor);
+			return (INT_PTR)bgBrush;
+		}
+		return false;
+	case WM_CTLCOLORDLG:
+		if (bgColorSet && bgBrush != NULL)
+		{
+			return (INT_PTR)bgBrush;
+		}
+		return false;
+>>>>>>> upstream/master
 	default:
 		/*
 		LRESULT returnVal;
@@ -1543,6 +1662,8 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 			silent = true;
 		else if(lstrcmpi(url, TEXT("/weaksecurity")) == 0)
 			g_ignorecertissues = true;
+		else if(lstrcmpi(url, TEXT("/nossl")) == 0)
+			nossl = true;
 		else if(lstrcmpi(url, TEXT("/caption")) == 0)
 			popstring(szCaption);
 		else if(lstrcmpi(url, TEXT("/username")) == 0)
@@ -1682,9 +1803,32 @@ void __declspec(dllexport) __cdecl get(HWND hwndParent,
 			CloseHandle(hFile);
 		}
 		else if(lstrcmpi(url, TEXT("/textcolor")) == 0)
+<<<<<<< HEAD
 			popstring(szTextColor);
 		else if(lstrcmpi(url, TEXT("/bgcolor")) == 0)
 			popstring(szBgColor);
+=======
+		{
+			TCHAR szTextColor[7]=TEXT("");
+			popstringn(szTextColor, 7);
+			if (szTextColor != NULL && lstrlen(szTextColor) == 6)
+			{
+				textColor = parseColor(szTextColor);
+				textColorSet = true;
+			}
+		}
+		else if(lstrcmpi(url, TEXT("/bgcolor")) == 0)
+		{
+			TCHAR szBgColor[7]=TEXT("");
+			popstringn(szBgColor, 7);
+			if (szBgColor != NULL && lstrlen(szBgColor) == 6)
+			{
+				bgColor = parseColor(szBgColor);
+				bgColorSet = true;
+				bgBrush = CreateSolidBrush(bgColor);
+			}
+		}
+>>>>>>> upstream/master
 	}
 	pushstring(url);
 //	if(*szCaption == 0) lstrcpy(szCaption, PLUGIN_NAME);
