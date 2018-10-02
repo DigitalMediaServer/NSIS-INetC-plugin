@@ -15,6 +15,7 @@ Changes in this fork are:
 * **1.0.5.3** - Added options `/TEXTCOLOR "RRGGBB"` and `/BGCOLOR "RRGGBB"`
 * **1.0.5.4** - Created a 4th download dialog `/MODERNPOPUP`
 * **1.0.5.5** - Created option `/NOSSL` which prevents redirects from HTTP to HTTPS
+* **1.0.5.6** - Applied changes from upstream `1.0.5.3`: `/tostackconv` supports UTF-8 and UTF-16LE BOM sniffing and conversion.
 
 Nadahar
 
