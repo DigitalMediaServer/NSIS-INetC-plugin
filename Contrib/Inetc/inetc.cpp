@@ -1162,6 +1162,7 @@ void progress_callback(void)
 	int time_sofar = max(1, (GetTickCount() - transfStart) / 1000);
 	int bps = cnt / time_sofar;
 	int remain = (cnt > 0 && fs != NOT_AVAILABLE) ? (MulDiv(time_sofar, fs, cnt) - time_sofar) : 0;
+	DWORD cntR=cnt, fsR=fs;
 	TCHAR *rtext=szSecond;
 	if(remain < 0) remain = 0;
 	if (remain >= 60)
@@ -1174,10 +1175,14 @@ void progress_callback(void)
 			rtext=szHour;
 		}
 	}
+	if (fs > 21474836 && fs != NOT_AVAILABLE) {
+	  cntR /= 1024;
+		fsR  /= 1024;
+	}
 	wsprintf(buf,
 		szProgress,
 		cnt/1024,
-		fs > 0 && fs != NOT_AVAILABLE ? MulDiv(100, cnt, fs) : 0,
+		fs > 0 && fs != NOT_AVAILABLE ? MulDiv(100, cntR, fsR) : 0, 
 		fs != NOT_AVAILABLE ? fs/1024 : 0,
 		bps/1024,((bps*10)/1024)%10
 		);
@@ -1189,7 +1194,7 @@ void progress_callback(void)
 		);
 	SetDlgItemText(hDlg, IDC_STATIC1, (cnt == 0 || status == ST_CONNECTING) ? szConnecting : buf);
 	if(fs > 0 && fs != NOT_AVAILABLE)
-		SendMessage(GetDlgItem(hDlg, IDC_PROGRESS1), PBM_SETPOS, MulDiv(cnt, PB_RANGE, fs), 0);
+		SendMessage(GetDlgItem(hDlg, IDC_PROGRESS1), PBM_SETPOS, MulDiv(cntR, PB_RANGE, fsR), 0);
 	if (*szCaption == 0)
 		wsprintf(buf, szDownloading, _tcsrchr(fn, TEXT('\\')) ? _tcsrchr(fn, TEXT('\\')) + 1 : fn);
 	else
