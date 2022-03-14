@@ -2,6 +2,7 @@
 *.sdf
 *.suo
 *.user
+*.vs
 /Intermediate
 *.exp
 *.lib
