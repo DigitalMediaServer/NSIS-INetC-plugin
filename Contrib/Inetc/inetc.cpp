@@ -136,6 +136,9 @@
 *              Created /NOSSL option that prevents redirects to HTTPS (which breaks Windows XP)
 *     Sep 24, 2018 - 1.0.5.6 - anders_k
 *              /tostackconv supports UTF-8 and UTF-16LE BOM sniffing and conversion.
+*     Mar 31, 2022 - 1.0.5.7 
+*              Fixed download progress for files larger than 2 GB (pjpuchyr)
+*              Reverted changes that broke /weaksecurity in 1.0.5.5
 *******************************************************/
 
 
@@ -185,7 +188,7 @@ FTP_CMD myFtpCommand;
 #define PROXY_AUTH_HDR TEXT("Proxy-authorization: basic %s")
 
 //#define MY_WEAKSECURITY_CERT_FLAGS SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_REVOCATION | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID | SECURITY_FLAG_IGNORE_CERT_CN_INVALID
-#define MY_WEAKSECURITY_CERT_FLAGS INTERNET_FLAG_IGNORE_CERT_CN_INVALID | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID | INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTP
+#define MY_WEAKSECURITY_CERT_FLAGS SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_REVOCATION
 #define MY_HTTPS_FLAGS (INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS | INTERNET_FLAG_SECURE)
 
 enum STATUS_CODES {
